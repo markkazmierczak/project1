@@ -23,11 +23,13 @@ tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
 
 #### Introduction 
 
-Paragraph or two introducing your datasets and variables, why they are interesting to you, etc.
+ For Project 1 I examined 2 sets of data about the NFL All-Pro rosters and team salary distribution between 2015-2020. The data that made up "data1" was a collection All-Pro Roster from the 2015-2020 seasons. This data 
 
 ```{R}
-# read your datasets in here, e.g., with read_csv()
-
+library(tidyverse)
+library(knitr)
+data1 <- read_csv("~/project1/All_pro.csv")
+data2 <- read_csv("~/project1/Salary_cap.csv")
 ```
 
 #### Tidying: Reshaping
@@ -35,16 +37,37 @@ Paragraph or two introducing your datasets and variables, why they are interesti
 If your datasets are tidy already, demonstrate that you can reshape data with pivot wider/longer here (e.g., untidy and then retidy). Alternatively, it may be easier to wait until the wrangling section so you can reshape your summary statistics. Note here if you are going to do this.
 
 ```{R}
-# your tidying code (if applicable; can also wait until wrangling section)
+# Pivot wider from data1
+wide_data1 <- data1 %>% pivot_wider(values_from = c(Tm), names_from = c(Year)) 
+
+head(wide_data1)
+
+
+# Pivot back to long
+longdata1 <- wide_data1 %>% pivot_longer(21:26, names_to= "year", values_to="Team") %>% na.omit() 
+
+head(longdata1)
 ```
 
     
 #### Joining/Merging
 
 ```{R}
-# your joining code
+# Clean up Data 1: Create a teamID for each team/year and make into new column for number of All-Pros on each team
+data1clean <- data1 %>% separate(Year, into = c("century","year"), sep = 2) %>% unite(Tm,year,col ="teamID", sep = "_" ) %>% 
+  group_by(teamID) %>% summarise(n()) %>% rename(all_pros= 'n()')
 
-# your joining code
+head(data1clean)
+
+# Clean up Data 2: Make the  teamID match data1
+data2clean <- data2 %>% separate(Team, into=c("year","team")) %>% unite(team,year, col="teamID", sep="_")
+
+head(data2clean)
+
+# Left Merge
+merged_data <- left_join(data2clean,data1clean)
+
+head(merged_data)
 ```
 
 Discussions of joining here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
@@ -52,11 +75,47 @@ Discussions of joining here. Feel encouraged to break up into more than once cod
 ####  Wrangling
 
 ```{R}
-# your wrangling code
 
-# your wrangling code
+# Count the NAs
+merged_data %>% summarise(sum(is.na(.)))
 
-# your wrangling code
+# Replace NA with 0s
+merged_data <- merged_data %>% replace(is.na(.), 0) 
+
+# Add "Winning_Season" column with mutate
+merged_data <- merged_data %>% mutate(season_result = ifelse(`Regular Season wins` > 8.1 , 'winning', 'losing'))
+
+# Add ratio paid to highest paid: Rookie Contracts
+merged_data <- merged_data %>% mutate(Highest_Rookie_Ratio = `% salary cap to highest paid player`/`% salary cap to players on rookie contracts`)
+
+glimpse(merged_data)
+
+# Mean "Highest_Rookie_Ratio" for winning season vs losing season
+merged_data %>% group_by(season_result) %>% summarise(mean(Highest_Rookie_Ratio)) %>% kable()
+
+
+# Median number of All-Pros for winning season vs losing season
+merged_data %>% group_by(season_result) %>% summarise(median(all_pros)) %>% kable()
+
+# 3 Losing teams with the most All-Pros
+merged_data %>% filter(season_result== "losing") %>% arrange(-all_pros) %>%  select(teamID, `Regular Season wins`, all_pros) %>%
+  head(3)%>% kable()
+
+# Detect Teams with a Tie
+merged_data %>% filter(str_detect(`Regular Season wins`, "[\\.]5")) %>% select(teamID, `Regular Season wins`) %>% kable()
+
+#Table of Winning vs Losing Season
+
+merged_data %>% group_by(season_result) %>% summarise(n()) %>% kable()
+
+# mean wins for teams that pay the highest paid player than all rookie contracts
+merged_data %>% filter(`% salary cap to highest paid player`>`% salary cap to players on rookie contracts`) %>% summarise(mean(`Regular Season wins`))
+
+# Max percent paid to top earner on teams with more than 10 wins
+merged_data %>% group_by(all_pros>median(all_pros), season_result) %>% summarise(max(`% salary cap to highest paid player`)) %>% kable()
+
+# Max percent paid to rookies on teams with more than 10 wins
+merged_data %>% group_by(`Regular Season wins`>10) %>% summarise(max(`% salary cap to players on rookie contracts`)) %>% kable()
 ```
 
 Your discussion of wrangling section here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
@@ -66,18 +125,29 @@ Your discussion of wrangling section here. Feel encouraged to break up into more
 
 ```{R}
 # your plot 1
+merged_data %>% ggplot(aes(x = `Regular Season wins`, fill = all_pros)) + geom_density() + facet_grid(all_pros ~ ., scales = "free_y")+ ylab("Density") + ggtitle("Distribution of Wins by Number of All-Pros on the Roster") + theme(plot.title = element_text(hjust = 0.5)) + theme(legend.position = "bottom")
 ```
 
 Your discussion of plot 1
 
 ```{R}
 # your plot 2
+
+merged_data %>% ggplot(aes(x = Highest_Rookie_Ratio, y =`Regular Season wins`, col= all_pros)) + geom_point(size = 1) + geom_smooth(method = "lm") + xlab("Highest Paid Player:Rookie Pay") + ggtitle("Regular Season Wins Over Player's Salary Ratio") + theme(plot.title = element_text(hjust = 0.5)) +
+  theme_minimal()
 ```
 
 Your discussion of plot 2
 
 ```{R}
 # your plot 3
+merged_data %>% ggplot(aes(x = season_result, y = `% salary cap to highest paid player`, fill= season_result)) +
+    geom_bar(stat = "summary", fun = mean) + xlab("Season Result") + 
+    ylab("Percent of Salary Cap (%)") + ggtitle("Average Percent Paid to Highest Paid Player Between Winning and Losing Seasons") + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(breaks = seq(0, 15, 3)) + 
+    geom_errorbar(stat = "summary", fun.data = mean_se, 
+        width = 0.33)+ theme(legend.position = " ") 
 ```
 
 Your discussion of plot 3
