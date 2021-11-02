@@ -23,7 +23,7 @@ tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
 
 #### Introduction 
 
- For Project 1 I examined 2 sets of data about the NFL All-Pro rosters and team salary distribution between 2015-2020. The data that made up "data1" was a collection All-Pro Roster from the 2015-2020 seasons. This data 
+ For Project 1 I examined 2 sets of data about the NFL All-Pro rosters and team salary distribution between 2015-2020. The data that made up "data1" was a collection All-Pro Rosters from the 2015-2020 seasons. This data 
 
 ```{R}
 library(tidyverse)
@@ -79,6 +79,7 @@ Discussions of joining here. Feel encouraged to break up into more than once cod
 # Count the NAs
 merged_data %>% summarise(sum(is.na(.)))
 
+
 # Replace NA with 0s
 merged_data <- merged_data %>% replace(is.na(.), 0) 
 
@@ -125,7 +126,9 @@ Your discussion of wrangling section here. Feel encouraged to break up into more
 
 ```{R}
 # your plot 1
-merged_data %>% ggplot(aes(x = `Regular Season wins`, fill = all_pros)) + geom_density() + facet_grid(all_pros ~ ., scales = "free_y")+ ylab("Density") + ggtitle("Distribution of Wins by Number of All-Pros on the Roster") + theme(plot.title = element_text(hjust = 0.5)) + theme(legend.position = "bottom")
+merged_data %>% ggplot(aes(x = `Regular Season wins`, fill = all_pros)) + geom_density() + facet_grid(all_pros ~ ., scales = "free_y") + scale_x_continuous(breaks = seq(0,16, 4)) +
+  ylab("Density") + ggtitle("Distribution of Wins by Number of All-Pros on the Roster") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) + theme(legend.position = "bottom") + 
+  scale_fill_fermenter() 
 ```
 
 Your discussion of plot 1
@@ -133,29 +136,23 @@ Your discussion of plot 1
 ```{R}
 # your plot 2
 
-merged_data %>% ggplot(aes(x = Highest_Rookie_Ratio, y =`Regular Season wins`, col= all_pros)) + geom_point(size = 1) + geom_smooth(method = "lm") + xlab("Highest Paid Player:Rookie Pay") + ggtitle("Regular Season Wins Over Player's Salary Ratio") + theme(plot.title = element_text(hjust = 0.5)) +
-  theme_minimal()
+merged_data %>% ggplot(aes(x = Highest_Rookie_Ratio, y =`Regular Season wins`, col= season_result)) + geom_point( size =1.5) + geom_smooth(method = "lm") +   geom_hline(yintercept = median(merged_data$`Regular Season wins`) , col = "red") + scale_x_continuous(breaks = seq(0, 1.2, .2)) +  xlab("Highest Paid Player:Rookie Pay") + ggtitle("Regular Season Wins Over Player's Salary Ratio")  +  scale_color_manual(values = c("losing" = "yellow2", "winning"= "forestgreen")) +  theme_classic() + theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 ```
 
 Your discussion of plot 2
 
 ```{R}
 # your plot 3
-merged_data %>% ggplot(aes(x = season_result, y = `% salary cap to highest paid player`, fill= season_result)) +
-    geom_bar(stat = "summary", fun = mean) + xlab("Season Result") + 
-    ylab("Percent of Salary Cap (%)") + ggtitle("Average Percent Paid to Highest Paid Player Between Winning and Losing Seasons") + 
-    theme(plot.title = element_text(hjust = 0.5)) + 
-    scale_y_continuous(breaks = seq(0, 15, 3)) + 
-    geom_errorbar(stat = "summary", fun.data = mean_se, 
-        width = 0.33)+ theme(legend.position = " ") 
+merged_data %>% ggplot(aes(x = season_result, y = `% salary cap to highest paid player`, 
+    fill = season_result)) + geom_bar(stat = "summary", fun = mean) + 
+    xlab("Season Result") + ylab("Percent of Salary Cap (%)") + 
+    ggtitle("Average Percent Paid to Highest Paid Player Between Winning and Losing Seasons")+ scale_y_continuous(breaks = seq(0, 15, 3)) +
+  geom_errorbar(stat = "summary", fun.data = mean_se, width = 0.33, aes(color= "red"))  + scale_fill_manual(values = c(losing = "yellow2", winning = "forestgreen")) + 
+  theme_minimal(base_family = "bold", base_size = 9) + theme(legend.position = "none ")
 ```
 
 Your discussion of plot 3
 
 #### Concluding Remarks
-
-If any!
-
-
 
 
