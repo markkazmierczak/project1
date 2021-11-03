@@ -23,7 +23,7 @@ tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
 
 #### Introduction 
 
- For Project 1 I examined 2 sets of data about the NFL All-Pro rosters and team salary distribution between 2015-2020. The data that made up "data1" was a collection All-Pro Rosters from the 2015-2020 seasons. This data 
+ For Project 1 I worked with 2 data sets containing data about NFL All-Pro Players and teams salary distributions. One data set I collected was the combined rosters of the All-Pro Teams between the years 2015-2020. This dataset contained a lot of player specific data that would not be used, but also included the number of players from each team and year that were selected to the All-Pro Team. The other dataset that I used was one that I created in SDS 328 that included the percentage of the salary cap that an NFL team paid to its highest paid player and to all of its players on rookie contracts, along with the number of regular season games that team won.  I decided to use these data sets because I thought it would be interesting to look at the impacts that All-Pro players have on the success of an NFL team as well as the impact of the distribution of salary.  
 
 ```{R}
 library(tidyverse)
@@ -59,10 +59,18 @@ data1clean <- data1 %>% separate(Year, into = c("century","year"), sep = 2) %>% 
 
 head(data1clean)
 
+# data1 distinct observation
+
+data1clean %>% summarise(n_distinct(teamID))
+
 # Clean up Data 2: Make the  teamID match data1
 data2clean <- data2 %>% separate(Team, into=c("year","team")) %>% unite(team,year, col="teamID", sep="_")
 
 head(data2clean)
+
+# data2 distinct observation
+
+data2clean %>% summarise(n_distinct(teamID))
 
 # Left Merge
 merged_data <- left_join(data2clean,data1clean)
@@ -70,7 +78,11 @@ merged_data <- left_join(data2clean,data1clean)
 head(merged_data)
 ```
 
-Discussions of joining here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+  In order to merge the two dataset I first had to create a unique identifier for each team. This identifier consisted of the three letter abbreviation for the team followed by an underscore and then a two digit code for the year. For instance the 2019 Green Bay Packers would be coded as "GNB_19". For dataset1 I accomplished this by first separating the "Year" into "century" and "year". I was then able to unite "Tm" and "year" variables and separate them by an underscore to create the "teamID" variable. With a "teamID" variable created I could now group by this variable and use the n() function to count the number of rows for each "teamID". The number of rows for each team was equal to the number of All-Pros on that given team. This column was then renamed "all_pros" and this dataset would be merged with data2.  
+    
+  Only the "teamID" variable needed to be created for data2 before it could be merged. The existing dataset had the two digit year followed by the team abbreviation. So I first split this team ID between the year and the abbreviation and then united them back together with an underscore to separate them. The "teamID" variables now matched and the data was tidy so I was able to merge the datasets. I decided to left merge data1clean onto data2 clean because data2clean only consisted of 60 teams that had been randomly selected from the years 2015-2020. data1clean had data from any team that had a All-Pros selections between those same years. This meant that any NAs that appeared on the dataset would mean that that team had zero All-Pros in that year. I would then be able to replace my NAs with "0". After merging the dataset consisted of 60 observations, meaning that 114 observations had been lost from dataset1. Some other data that was potentially lost was that of players that played on two teams on a given season. The dataset containing the rosters did not include the two teams for which they played so they could not be assigned a "teamID" variable that linked to the other data set.
+  
+  Both datasets were tidy so I practiced pivoting the original data1 wide and then back long.
 
 ####  Wrangling
 
@@ -113,46 +125,45 @@ merged_data %>% group_by(season_result) %>% summarise(n()) %>% kable()
 merged_data %>% filter(`% salary cap to highest paid player`>`% salary cap to players on rookie contracts`) %>% summarise(mean(`Regular Season wins`))
 
 # Max percent paid to top earner on teams with more than 10 wins
-merged_data %>% group_by(all_pros>median(all_pros), season_result) %>% summarise(max(`% salary cap to highest paid player`)) %>% kable()
+merged_data %>% group_by(all_pros>median(all_pros), season_result) %>% summarise(mean(`% salary cap to highest paid player`)) %>% kable()
 
 # Max percent paid to rookies on teams with more than 10 wins
-merged_data %>% group_by(`Regular Season wins`>10) %>% summarise(max(`% salary cap to players on rookie contracts`)) %>% kable()
+merged_data %>% group_by(`Regular Season wins`>10) %>% summarise(mean(`% salary cap to players on rookie contracts`)) %>% kable()
 ```
 
-Your discussion of wrangling section here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+Before manipulating the merged_data set I used summarize function to count the number of NAs present in the dataset. These NAs represented teams that had no All-Pros on the roster. The replace function was used to replaces the NAs with 0. I then wanted to create a categorical variable describing whether or not the team had a winning season. This was done by creating a new column using the mutate function and then using the ifelse function to separate teams that either won more than eight games ("winning") or won eight or less games ("losing"). The final variable that was created was ratio of single highest paid player pay to the pay of all of the rookie contracts.
+
+One of the first ways the data was analyzed was by grouping between winning and losing seasons and then finding the median number of All-Pros these teams had on their rosters. The median number of All-Pros on teams with winning records was 3.5 while teams with losing records only had a median of 1 All-Pro. I also used the group_by function without creating a new variable to group by teams that had ten or more wins. I used this number because ten wins typically means you will have enough wins to make the playoffs. I used these groups and then found that on average teams with losing records paid their rookies 18.7 % of all salary while teams with winning records paid their rookies only 14.7% of the team salary. A few teams had tied a game in the recorded season which counts as 0.5 wins. These teams were identified using str_detect function. Using this function, I searched for any team with a ".5" in the Regular Season Wins variable. 
 
 
 #### Visualizing
 
 ```{R}
-# your plot 1
-merged_data %>% ggplot(aes(x = `Regular Season wins`, fill = all_pros)) + geom_density() + facet_grid(all_pros ~ ., scales = "free_y") + scale_x_continuous(breaks = seq(0,16, 4)) +
+# Plot 1: Win Distributions
+merged_data %>% ggplot(aes(x = `Regular Season wins`, fill = all_pros)) + geom_density() +
+  facet_grid(all_pros ~ ., scales = "free_y") + scale_x_continuous(breaks = seq(0,16, 4)) +
   ylab("Density") + ggtitle("Distribution of Wins by Number of All-Pros on the Roster") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) + theme(legend.position = "bottom") + 
   scale_fill_fermenter() 
 ```
 
-Your discussion of plot 1
+To visualize the effect of having All-Pros on a roster has on the teams record I created this density plot. I filled the plot by the all_pros variable and faceted the plot so that each groups could be independently observed. On teams with on 0-1 All-Pros the distribution of wins is mostly less than 8. Teams with 2-4 All-Pros saw in increase in the number of wins and were more evenly distributed around the 8 win mark. This trend of increasing with the increasing number of players continued on teams that had with 5-6 players. Most of these teams had well over 8 wins. It is important to note the the Y axis is scaled independently. Although this changes the values on the Y axis for each graph, it makes it easier to observe the effect that All-Pros have of the distribution of wins. 
 
 ```{R}
-# your plot 2
+#Plot 2: Wins over the ratio of single player to rookie contracts salary
 
-merged_data %>% ggplot(aes(x = Highest_Rookie_Ratio, y =`Regular Season wins`, col= season_result)) + geom_point( size =1.5) + geom_smooth(method = "lm") +   geom_hline(yintercept = median(merged_data$`Regular Season wins`) , col = "red") + scale_x_continuous(breaks = seq(0, 1.2, .2)) +  xlab("Highest Paid Player:Rookie Pay") + ggtitle("Regular Season Wins Over Player's Salary Ratio")  +  scale_color_manual(values = c("losing" = "yellow2", "winning"= "forestgreen")) +  theme_classic() + theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+merged_data %>% ggplot(aes(x = Highest_Rookie_Ratio, y =`Regular Season wins`, col= season_result)) + geom_point( size =1.5) + geom_smooth(method = "lm") +   geom_vline(xintercept = mean(merged_data$Highest_Rookie_Ratio) , col = "red") + scale_x_continuous(breaks = seq(0, 1.2, .2)) +  xlab("Highest Paid Player:Rookie Pay") + ggtitle("Regular Season Wins Over Player's Salary Ratio")  +  scale_color_manual(values = c("losing" = "yellow2", "winning"= "forestgreen")) +  theme_classic() + theme(plot.title = element_text(hjust = 0.5, face = "bold")) 
 ```
 
-Your discussion of plot 2
+In this graph I looked at the relationship between regular season wins and the pay ratio variable that was created. To create this graph merged_data was group by the result of the season and then then number of wins was plotted against the pay ratio. A trend line was added using a linear model. A red vertical line was added to represent the average ratio. For both teams with losing and winning records there appeared to be a slight and similar positive relationship between these variables. With the red vertical line we can also observe that most teams with a losing record have a pay ratio less than the average ratio, while most teams with a winning record have an above average pay ratio. This relationship suggests that paying individual star players a high ratio of the salary compared to rookies can have a positive effect on the total number of wins.
 
 ```{R}
-# your plot 3
+# Plot3: Average Percent Paid to single highest paid player between teams with losing and winning records
 merged_data %>% ggplot(aes(x = season_result, y = `% salary cap to highest paid player`, 
     fill = season_result)) + geom_bar(stat = "summary", fun = mean) + 
-    xlab("Season Result") + ylab("Percent of Salary Cap (%)") + 
-    ggtitle("Average Percent Paid to Highest Paid Player Between Winning and Losing Seasons")+ scale_y_continuous(breaks = seq(0, 15, 3)) +
+    xlab("Season Result") + ylab("Percent of Salary Cap to Highest Paid Player (%)") + 
+    ggtitle("Average Percent Paid to Highest Paid Player Between Winning and Losing Seasons") + scale_y_continuous(breaks = seq(0, 15, 3)) +
   geom_errorbar(stat = "summary", fun.data = mean_se, width = 0.33, aes(color= "red"))  + scale_fill_manual(values = c(losing = "yellow2", winning = "forestgreen")) + 
   theme_minimal(base_family = "bold", base_size = 9) + theme(legend.position = "none ")
 ```
 
-Your discussion of plot 3
-
-#### Concluding Remarks
-
-
+I created a bar chart with error bars with only the percentage paid to the highest paid player variable instead of the ratio variable. I was looking to see if there was a continuation of the trend between total wins and the highest paid player to rookie contract ratio would be observed when looking at only the highest paid player percentage. Once again I grouped by the result of the season and then compared percent of salary each group paid to the highest earning player. As expected after observing the trend in Plot 2, it appeared that teams with winning records paid their star players a higher percentage of the salary cap. This helps explain the relationship observed in plot 2, but a similar plot with percent of salary cap to rookie contracts in combination with this graph would better help us visualize the effect each of these two variable has in determining the relationship observed in Plot 2.
